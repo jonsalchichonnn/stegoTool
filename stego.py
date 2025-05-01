@@ -482,12 +482,30 @@ if __name__ == "__main__":
             # Attempt to decode
             secret_message = stego.decode(image_path, password)
             
-            print("\n" + "="*60)
-            print("DECODED MESSAGE:")
-            print("="*60)
-            print(secret_message)
-            print("="*60)
+            print("\nDecoded message ready.")
+            print(" [S] Display on screen")
+            print(" [F] Save to text file")
+            while True:
+                out_mode = input("Choose S or F: ").strip().upper()
+                if out_mode in ('S', 'F'):
+                    break
+                print("Invalid choice. Please enter 'S' or 'F'.")
             
+            if out_mode == 'F':
+                default_output = "decoded_message.txt"
+                file_out = input(f"\nEnter output text file path [default: {default_output}]: ").strip()
+                if not file_out:
+                    file_out = default_output
+                with open(file_out, 'w', encoding='utf-8') as f:
+                    f.write(secret_message)
+                print(f"\nDecoded message saved to {file_out}")
+            else:
+                print("\n" + "="*60)
+                print("DECODED MESSAGE:")
+                print("="*60)
+                print(secret_message)
+                print("="*60)
+
         except Exception as e:
             print(f"\nError decoding: {e}")
             print("\nPossible issues:")
