@@ -355,16 +355,38 @@ if __name__ == "__main__":
             else:
                 print(f"Error: File '{cover_image}' not found. Please try again.")
         
-        # Get secret message
-        print("\nEnter your secret message (press Enter twice when done):")
-        lines = []
+
+        print("\nHow would you like to provide the secret message?")
+        print(" [K] Keyboard")
+        print(" [F] (Text) File")
         while True:
-            line = input()
-            if not line and lines and not lines[-1]:  # Two consecutive empty lines
-                lines.pop()  # Remove the last empty line
+            mode = input("Choose K or F: ").strip().upper()
+            if mode in ('K', 'F'):
                 break
-            lines.append(line)
-        secret = "\n".join(lines)
+            print("Invalid choice. Please enter 'K' for Keyboard or 'F' for Text file.")
+        
+        if mode == 'F':
+            # Read entire message from a text file
+            while True:
+                file_path = input("\nEnter path to text file: ").strip()
+                if os.path.exists(file_path):
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        secret = f.read()
+                    break
+                else:
+                    print(f"Error: '{file_path}' not found. Please try again.")
+        else:
+            # Original keyboard input
+            print("\nEnter your secret message (press Enter twice when done):")
+            lines = []
+            while True:
+                line = input()
+                if not line and lines and not lines[-1]:  # Two consecutive empty lines
+                    lines.pop()  # Remove the last empty line
+                    break
+                lines.append(line)
+            secret = "\n".join(lines)
+
         
         # Get password
         import getpass
