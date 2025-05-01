@@ -1,0 +1,6 @@
+cffi==1.17.1
+cryptography==44.0.2
+numpy==2.2.5
+opencv-python==4.11.0.86
+pillow==11.2.1
+pycparser==2.22
