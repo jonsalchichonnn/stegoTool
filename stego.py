@@ -2,12 +2,10 @@ import cv2
 import numpy as np
 from PIL import Image
 import os
-import base64
 import hashlib
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 import secrets
-import mimetypes
 import struct
 
 class ImageSteganography:
@@ -316,51 +314,6 @@ class ImageSteganography:
         # 4. Save with optimal settings for Reddit
         new_img.save(image_path, format='PNG', optimize=True, compress_level=9)
         return image_path
-        
-    def add_redundancy2(self, image_path, output_path, password, secret_data, original_filename=None, redundancy=3):
-        """Add redundancy by encoding the message multiple times in different areas"""
-        # Read the image
-        img = cv2.imread(image_path)
-        height, width = img.shape[:2]
-        
-        # Split the image into multiple regions
-        regions = []
-        region_height = height // redundancy
-        
-        for i in range(redundancy):
-            start_y = i * region_height
-            end_y = (i + 1) * region_height if i < redundancy - 1 else height
-            regions.append((start_y, end_y))
-        
-        # Create temporary files for each region
-        temp_files = []
-        for i, (start_y, end_y) in enumerate(regions):
-            # Create a copy of the main image
-            region_img = img.copy()
-            
-            # Create region-specific output file
-            temp_file = f"temp_region_{i}.png"
-            cv2.imwrite(temp_file, region_img)
-            
-            # Encode the same message with a region-specific password
-            region_password = f"{password}_region_{i}"
-            self.encode(temp_file, secret_data, temp_file, region_password, original_filename)
-            
-            temp_files.append(temp_file)
-        
-        # Combine all regions back into one image
-        combined_img = img.copy()
-        
-        # Save the final image
-        cv2.imwrite(output_path, combined_img)
-        
-        # Clean up temp files
-        for temp_file in temp_files:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-        
-        print(f"Data encoded with {redundancy}x redundancy. Saved to {output_path}")
-        return output_path
     
     def add_redundancy(self, image_path, password, secret_data, original_filename=None):
         """Add redundancy by encoding the message multiple times in different areas"""
