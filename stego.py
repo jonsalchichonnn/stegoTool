@@ -11,6 +11,8 @@ import mimetypes
 import struct
 
 class ImageSteganography:
+    REDUNDANCY = 3  # Default redundancy level for encoding
+
     def __init__(self):
         self.delimiter = "##END##"
         self.iterations = 100000  # For key derivation
@@ -188,7 +190,6 @@ class ImageSteganography:
         
         # Save the image as PNG (lossless)
         cv2.imwrite(output_path, stego_img)
-        print(f"Data encoded successfully. Saved to {output_path}")
         
         # Verify the image was saved correctly
         if not os.path.exists(output_path):
@@ -292,7 +293,7 @@ class ImageSteganography:
         return most_common, "rbr"
 
 
-    def social_media_optimize(self, image_path, output_path):
+    def social_media_optimize(self, image_path):
         """Optimize encoded image for Reddit sharing"""
         # Load the image
         img = Image.open(image_path)
@@ -313,10 +314,8 @@ class ImageSteganography:
         new_img.putdata(data)
         
         # 4. Save with optimal settings for Reddit
-        new_img.save(output_path, format='PNG', optimize=True, compress_level=9)
-        
-        print(f"Image optimized for Reddit. Saved to {output_path}")
-        return output_path
+        new_img.save(image_path, format='PNG', optimize=True, compress_level=9)
+        return image_path
         
     def add_redundancy2(self, image_path, output_path, password, secret_data, original_filename=None, redundancy=3):
         """Add redundancy by encoding the message multiple times in different areas"""
@@ -363,9 +362,8 @@ class ImageSteganography:
         print(f"Data encoded with {redundancy}x redundancy. Saved to {output_path}")
         return output_path
     
-    def add_redundancy(self, image_path, output_path, password, secret_data, original_filename=None, redundancy=3):
+    def add_redundancy(self, image_path, password, secret_data, original_filename=None):
         """Add redundancy by encoding the message multiple times in different areas"""
-
         # Read the original image
         img = cv2.imread(image_path)
         if img is None:
@@ -375,10 +373,10 @@ class ImageSteganography:
 
         # Prepare region coordinates
         regions = []
-        region_height = height // redundancy
-        for i in range(redundancy):
+        region_height = height // self.REDUNDANCY
+        for i in range(self.REDUNDANCY):
             start_y = i * region_height
-            end_y = (i + 1) * region_height if i < redundancy - 1 else height
+            end_y = (i + 1) * region_height if i < self.REDUNDANCY - 1 else height
             regions.append((start_y, end_y))
 
         # Placeholder for the final image to be assembled
@@ -411,15 +409,14 @@ class ImageSteganography:
             temp_files.append(temp_file)
 
         # Save the final image
-        cv2.imwrite(output_path, combined_img)
+        cv2.imwrite(image_path, combined_img)
 
         # Clean up
         for temp_file in temp_files:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
-        print(f"Data encoded with {redundancy}x redundancy. Saved to {output_path}")
-        return output_path
+        return image_path
 
 
 # Example usage for Reddit
@@ -503,14 +500,12 @@ if __name__ == "__main__":
             lines = []
             while True:
                 line = input()
-                if not line and lines and not lines[-1]:  # Two consecutive empty lines
-                    lines.pop()  # Remove the last empty line
+                if not line and lines:
                     break
                 lines.append(line)
             secret = "\n".join(lines).encode('utf-8')
             original_filename = "secret_message.txt"  # Default filename for text input
 
-        
         # Get password
         import getpass
         try:
@@ -536,33 +531,14 @@ if __name__ == "__main__":
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir)
         
-        print("\nEncoding data...")
-        
         try:
-            # Basic encoding
+            print("\nEncoding data...")
             stego.encode(cover_image, secret, output_image, password, original_filename)
-            
-            # Ask for Reddit optimization
-            print("\nData encoded successfully!")
-            optimize = input("\nWould you like to optimize for Reddit? (y/n): ").lower()
-            
-            if optimize == 'y' or optimize == 'yes':
-                reddit_image = output_image.replace(".png", "_reddit.png")
-                
-                # Ask for redundancy
-                add_redundancy = input("\nAdd redundancy for better robustness? (y/n): ").lower()
-                
-                if add_redundancy == 'y' or add_redundancy == 'yes':
-                    redundant_image = output_image.replace(".png", "_redundant.png")
-                    stego.add_redundancy(output_image, redundant_image, password, secret, original_filename, redundancy=3)
-                    stego.social_media_optimize(redundant_image, reddit_image)
-                    print(f"\nOptimized image with redundancy saved to: {reddit_image}")
-                else:
-                    stego.social_media_optimize(output_image, reddit_image)
-                    print(f"\nOptimized image saved to: {reddit_image}")
-            
-            print("\nOperation completed successfully!")
-            
+            print(f"Adding {stego.REDUNDANCY}x redundancy...")
+            stego.add_redundancy(output_image, password, secret, original_filename)
+            print(f"Optimizing image for Reddit...")
+            stego.social_media_optimize(output_image)
+            print(f"\nOperation completed successfully! Saved to: {output_image}")
         except Exception as e:
             print(f"\nError during encoding: {e}")
         
@@ -582,8 +558,7 @@ if __name__ == "__main__":
             image_path = input("\nEnter path to encoded image: ").strip()
             
             # Remove quotes if present
-            if (image_path.startswith('"') and image_path.endswith('"')) or \
-               (image_path.startswith("'") and image_path.endswith("'")):
+            if (image_path.startswith('"') and image_path.endswith('"')) or (image_path.startswith("'") and image_path.endswith("'")):
                 image_path = image_path[1:-1]
                 
             if os.path.exists(image_path):
@@ -604,12 +579,6 @@ if __name__ == "__main__":
         try:
             # Attempt to decode
             decoded_data, filename = stego.decode_auto(image_path, password)
-            
-            # if filename:
-            #     print(f"\nDecoded file: {filename}")
-            # else:
-            #     print("\nDecoded data ready. No embedded filename found.")
-            #     filename = "decoded_data.bin"  # Default filename
             
             print("\nHow would you like to save the decoded data?")
             print(" [S] Display on screen (if it's text)")
