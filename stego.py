@@ -195,64 +195,103 @@ class ImageSteganography:
             raise FileNotFoundError(f"Failed to save image to {output_path}")
         
         return output_path
-    
+
+
     def decode(self, stego_image_path, password):
         """Extract and decrypt secret data from stego image"""
         # Read the stego image
         img = cv2.imread(stego_image_path)
         if img is None:
             raise ValueError("Could not read the image. Check the path.")
-        
-        # Flatten the image
+
+        # Flatten image for bit access
         img_flat = img.flatten()
-        
-        # First, read the message length from the first 32 pixels
+
+        # Extract the message length from the first 32 pixels
         length_binary = ''.join(str(img_flat[i] & 1) for i in range(32))
         message_length = int(length_binary, 2)
-        
-        # Get dimensions (same as encoding)
+
+        # Get dimensions
         height, width = img.shape[:2]
         safe_height = int(height * 0.95)
         safe_width = int(width * 0.95)
-        
-        # Generate the same pseudorandom pixel positions
+
+        # Generate pseudorandom pixel positions (same as encode)
         np.random.seed(int.from_bytes(hashlib.sha256(password.encode()).digest()[:4], 'big'))
         pixel_positions = np.random.permutation(safe_height * safe_width * 3)[:message_length]
-        
-        # Extract LSBs from the specified positions
+
+        # Extract LSBs in the order of the pixel positions
         binary_message = ''.join(str(img_flat[pos] & 1) for pos in pixel_positions)
-        
-        # Convert binary to bytes
-        encrypted_bytes = self.binary_to_text(binary_message)
-        
+
+        # Convert binary string to bytes
+        encrypted_data = self.binary_to_text(binary_message)
+
         try:
             # Decrypt the message
-            decrypted_data = self.decrypt(encrypted_bytes, password)
-            
-            # Remove delimiter
-            if self.delimiter.encode('utf-8') in decrypted_data:
-                delimiter_index = decrypted_data.find(self.delimiter.encode('utf-8'))
-                decrypted_data = decrypted_data[:delimiter_index]
-            
-            # Check if this is a file with embedded filename
+            decrypted = self.decrypt(encrypted_data, password)
+
+            # Truncate at delimiter
+            if self.delimiter.encode('utf-8') in decrypted:
+                decrypted = decrypted.split(self.delimiter.encode('utf-8'))[0]
+
+            # Attempt to extract embedded filename
             try:
-                # Extract filename length (first 4 bytes)
-                filename_len = struct.unpack("!I", decrypted_data[:4])[0]
-                
-                # Extract filename
-                filename = decrypted_data[4:4+filename_len].decode('utf-8')
-                
-                # Extract actual data
-                data = decrypted_data[4+filename_len:]
-                
+                filename_len = struct.unpack("!I", decrypted[:4])[0]
+                filename = decrypted[4:4 + filename_len].decode('utf-8')
+                data = decrypted[4 + filename_len:]
                 return data, filename
-            except:
-                # If something goes wrong, treat it as a regular message
-                return decrypted_data, None
-            
+            except Exception:
+                # If extraction fails, assume no filename
+                return decrypted, None
+
         except Exception as e:
-            raise ValueError(f"Decryption failed. Incorrect password or corrupted data: {e}")
-    
+            raise ValueError(f"Decryption failed. Possibly wrong password or corrupted image: {e}")
+
+
+    def decode_auto(self, image_path, password):
+        img = cv2.imread(image_path)
+        if img is None:
+            raise ValueError("Could not read the image.")
+
+        # Non-redundant decoding
+        decoded_data, filename =  self.decode(image_path, password)
+        if decoded_data:
+            return decoded_data, filename
+
+        # decode redundancy
+        redundancy = 3
+        height, width = img.shape[:2]
+        region_height = height // redundancy
+        recovered_messages = []
+
+        for i in range(redundancy):
+            start_y = i * region_height
+            end_y = (i + 1) * region_height if i < redundancy - 1 else height
+            region = img[start_y:end_y, :].copy()
+
+            temp_file = f"temp_decode_region_{i}.png"
+            cv2.imwrite(temp_file, region)
+
+            try:
+                region_password = f"{password}_region_{i}"
+                msg,_ = self.decode(temp_file, region_password)
+                recovered_messages.append(msg)
+            except Exception as e:
+                print(f"Failed to decode region {i}: {e}")
+                recovered_messages.append(None)
+
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+
+        from collections import Counter
+        valid_msgs = [m for m in recovered_messages if m is not None]
+        if not valid_msgs:
+            raise ValueError("Failed to decode any region.")
+
+        most_common = Counter(valid_msgs).most_common(1)[0][0]
+        return most_common, "rbr"
+
+
     def social_media_optimize(self, image_path, output_path):
         """Optimize encoded image for Reddit sharing"""
         # Load the image
@@ -279,7 +318,7 @@ class ImageSteganography:
         print(f"Image optimized for Reddit. Saved to {output_path}")
         return output_path
         
-    def add_redundancy(self, image_path, output_path, password, secret_data, original_filename=None, redundancy=3):
+    def add_redundancy2(self, image_path, output_path, password, secret_data, original_filename=None, redundancy=3):
         """Add redundancy by encoding the message multiple times in different areas"""
         # Read the image
         img = cv2.imread(image_path)
@@ -323,6 +362,65 @@ class ImageSteganography:
         
         print(f"Data encoded with {redundancy}x redundancy. Saved to {output_path}")
         return output_path
+    
+    def add_redundancy(self, image_path, output_path, password, secret_data, original_filename=None, redundancy=3):
+        """Add redundancy by encoding the message multiple times in different areas"""
+
+        # Read the original image
+        img = cv2.imread(image_path)
+        if img is None:
+            raise ValueError("Could not read the image.")
+        
+        height, width = img.shape[:2]
+
+        # Prepare region coordinates
+        regions = []
+        region_height = height // redundancy
+        for i in range(redundancy):
+            start_y = i * region_height
+            end_y = (i + 1) * region_height if i < redundancy - 1 else height
+            regions.append((start_y, end_y))
+
+        # Placeholder for the final image to be assembled
+        combined_img = img.copy()
+
+        temp_files = []
+
+        for i, (start_y, end_y) in enumerate(regions):
+            # Extract the region from the image
+            region = img[start_y:end_y, :].copy()
+
+            # Save region temporarily
+            temp_file = f"temp_region_{i}.png"
+            cv2.imwrite(temp_file, region)
+
+            # Use region-specific password
+            region_password = f"{password}_region_{i}"
+
+            # Encode secret into the region
+            self.encode(temp_file, secret_data, temp_file, region_password, original_filename)
+
+            # Reload the modified region from disk
+            encoded_region = cv2.imread(temp_file)
+            if encoded_region is None:
+                raise ValueError(f"Failed to load modified region {temp_file}")
+
+            # Place the encoded region back into the final image
+            combined_img[start_y:end_y, :] = encoded_region
+
+            temp_files.append(temp_file)
+
+        # Save the final image
+        cv2.imwrite(output_path, combined_img)
+
+        # Clean up
+        for temp_file in temp_files:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+
+        print(f"Data encoded with {redundancy}x redundancy. Saved to {output_path}")
+        return output_path
+
 
 # Example usage for Reddit
 if __name__ == "__main__":
@@ -505,13 +603,13 @@ if __name__ == "__main__":
         
         try:
             # Attempt to decode
-            decoded_data, filename = stego.decode(image_path, password)
+            decoded_data, filename = stego.decode_auto(image_path, password)
             
-            if filename:
-                print(f"\nDecoded file: {filename}")
-            else:
-                print("\nDecoded data ready. No embedded filename found.")
-                filename = "decoded_data.bin"  # Default filename
+            # if filename:
+            #     print(f"\nDecoded file: {filename}")
+            # else:
+            #     print("\nDecoded data ready. No embedded filename found.")
+            #     filename = "decoded_data.bin"  # Default filename
             
             print("\nHow would you like to save the decoded data?")
             print(" [S] Display on screen (if it's text)")
