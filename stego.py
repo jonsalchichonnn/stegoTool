@@ -268,7 +268,7 @@ class ImageSteganography:
 
             try:
                 region_password = f"{password}_region_{i}"
-                msg,_ = self.decode_helper(temp_file, region_password)
+                msg,filename = self.decode_helper(temp_file, region_password)
                 recovered_messages.append(msg)
             except Exception as e:
                 print(f"Failed to decode region {i}: {e}")
@@ -283,7 +283,7 @@ class ImageSteganography:
             raise ValueError("Failed to decode any region.")
 
         most_common = Counter(valid_msgs).most_common(1)[0][0]
-        return most_common, "rbr"
+        return most_common, filename
 
 
     def social_media_optimize(self, image_path):
