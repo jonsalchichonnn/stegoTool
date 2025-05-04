@@ -441,6 +441,9 @@ if __name__ == "__main__":
             while True:
                 file_path = input("\nEnter path to file: ").strip()
                 if os.path.exists(file_path):
+                    if os.path.getsize(file_path) == 0:
+                        print(f"Error: The file '{file_path}' is empty. Please select another file.")
+                        continue
                     original_filename = os.path.basename(file_path)
                     with open(file_path, 'rb') as f:
                         secret = f.read()
@@ -459,19 +462,37 @@ if __name__ == "__main__":
             secret = "\n".join(lines).encode('utf-8')
             original_filename = "secret_message.txt"  # Default filename for text input
 
+            if not secret.strip():
+                print("\nError: The secret message cannot be empty.")
+                input("\nPress Enter to return to the main menu...")
+                return
+
         # Get password
         import getpass
-        try:
-            password = getpass.getpass("\nEnter password to encrypt message: ")
-            confirm_password = getpass.getpass("Confirm password: ")
-            
-            if password != confirm_password:
-                print("\nError: Passwords do not match. Operation cancelled.")
-                input("\nPress Enter to return to main menu...")
-                return
-        except Exception:
-            print("\nSecure password entry not available in this environment.")
-            password = input("Enter password (will be visible): ")
+        while True:
+            try:
+                password = getpass.getpass("\nEnter password to encrypt message: ")
+                if not password:
+                    print("Error: Password cannot be empty. Please try again.")
+                    continue
+                
+                confirm_password = getpass.getpass("Confirm password: ")
+                if password != confirm_password:
+                    print("Error: Passwords do not match. Please try again.")
+                    continue
+                
+                break  # Valid password entered
+            except Exception:
+                # Fallback if getpass isn’t available
+                password = input("\nEnter password (will be visible): ").strip()
+                if not password:
+                    print("Error: Password cannot be empty. Please try again.")
+                    continue
+                confirm_password = input("Confirm password: ").strip()
+                if password != confirm_password:
+                    print("Error: Passwords do not match. Please try again.")
+                    continue
+                break
         
         # Get output path
         default_output = "stego_output.png"
