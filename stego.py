@@ -196,7 +196,7 @@ class ImageSteganography:
         return output_path
 
 
-    def decode(self, stego_image_path, password):
+    def decode_helper(self, stego_image_path, password):
         """Extract and decrypt secret data from stego image"""
         # Read the stego image
         img = cv2.imread(stego_image_path)
@@ -252,12 +252,7 @@ class ImageSteganography:
         if img is None:
             raise ValueError("Could not read the image.")
 
-        # Non-redundant decoding
-        decoded_data, filename =  self.decode(image_path, password)
-        if decoded_data:
-            return decoded_data, filename
-
-        # decode redundancy
+        # Decode redundancy
         redundancy = 3
         height, width = img.shape[:2]
         region_height = height // redundancy
@@ -273,7 +268,7 @@ class ImageSteganography:
 
             try:
                 region_password = f"{password}_region_{i}"
-                msg,_ = self.decode(temp_file, region_password)
+                msg,_ = self.decode_helper(temp_file, region_password)
                 recovered_messages.append(msg)
             except Exception as e:
                 print(f"Failed to decode region {i}: {e}")
@@ -451,21 +446,21 @@ if __name__ == "__main__":
                 else:
                     print(f"Error: '{file_path}' not found. Please try again.")
         else:
-            # Original keyboard input
-            print("\nEnter your secret message (press Enter twice when done):")
-            lines = []
             while True:
-                line = input()
-                if not line and lines:
-                    break
-                lines.append(line)
-            secret = "\n".join(lines).encode('utf-8')
-            original_filename = "secret_message.txt"  # Default filename for text input
+                print("\nEnter your secret message (press Enter twice when done):")
+                lines = []
+                while True:
+                    line = input()
+                    if not line and lines:
+                        break
+                    lines.append(line)
 
-            if not secret.strip():
-                print("\nError: The secret message cannot be empty.")
-                input("\nPress Enter to return to the main menu...")
-                return
+                secret = "\n".join(lines).encode('utf-8')
+                original_filename = "secret_message.txt"
+                if secret:
+                    break
+                else:
+                    print("\nError: The secret message cannot be empty. Please try again.\n")
 
         # Get password
         import getpass
@@ -621,7 +616,7 @@ if __name__ == "__main__":
                 for i in range(3):
                     try:
                         region_password = f"{password}_region_{i}"
-                        decoded_data, filename = stego.decode(image_path, region_password)
+                        decoded_data, filename = stego.decode_helper(image_path, region_password)
                         
                         if filename:
                             print(f"\nRecovered file '{filename}' from region {i}")
@@ -693,20 +688,25 @@ if __name__ == "__main__":
         input("\nPress Enter to return to main menu...")
     
     # Main program loop
-    while True:
-        choice = main_menu()
-        
-        if choice == 1:
-            encode_menu()
-        elif choice == 2:
-            decode_menu()
-        elif choice == 3:
-            about_program()
-        elif choice == 4:
-            clear_screen()
-            print("\nThank you for using the Steganography Tool!")
-            print("Exiting program...\n")
-            break
+    try:
+        while True:
+            choice = main_menu()
+            
+            if choice == 1:
+                encode_menu()
+            elif choice == 2:
+                decode_menu()
+            elif choice == 3:
+                about_program()
+            elif choice == 4:
+                clear_screen()
+                print("\nThank you for using the Steganography Tool!")
+                print("Exiting program...\n")
+                break
+    except KeyboardInterrupt:
+        clear_screen()
+        print("\n\nKeyboardInterrupt detected.")
+        print("Exiting program gracefully...\n")
 
 """
 Features implemented:
