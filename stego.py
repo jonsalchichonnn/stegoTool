@@ -461,17 +461,30 @@ if __name__ == "__main__":
 
         # Get password
         import getpass
-        try:
-            password = getpass.getpass("\nEnter password to encrypt message: ")
-            confirm_password = getpass.getpass("Confirm password: ")
-            
-            if password != confirm_password:
-                print("\nError: Passwords do not match. Operation cancelled.")
-                input("\nPress Enter to return to main menu...")
-                return
-        except Exception:
-            print("\nSecure password entry not available in this environment.")
-            password = input("Enter password (will be visible): ")
+        while True:
+            try:
+                password = getpass.getpass("\nEnter password to encrypt message: ")
+                if not password:
+                    print("Error: Password cannot be empty. Please try again.")
+                    continue
+                
+                confirm_password = getpass.getpass("Confirm password: ")
+                if password != confirm_password:
+                    print("Error: Passwords do not match. Please try again.")
+                    continue
+                
+                break  # Valid password entered
+            except Exception:
+                # Fallback if getpass isn’t available
+                password = input("\nEnter password (will be visible): ").strip()
+                if not password:
+                    print("Error: Password cannot be empty. Please try again.")
+                    continue
+                confirm_password = input("Confirm password: ").strip()
+                if password != confirm_password:
+                    print("Error: Passwords do not match. Please try again.")
+                    continue
+                break
         
         # Get output path
         default_output = "stego_output.png"
